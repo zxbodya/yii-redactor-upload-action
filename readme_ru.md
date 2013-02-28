@@ -1,7 +1,7 @@
-ImageUploadAction
+RedactorUploadAction
 ========================
 
-`ImageUploadAction` — это действие предназначеное для обработки загрузки картинок на серевер из редактора.
+`RedactorUploadAction` — это действие предназначеное для обработки загрузки картинок и файлов на серевер из редактора.
 
 Параметры действия
 -------------------
@@ -17,8 +17,8 @@ ImageUploadAction
 
 `saveCallback` – Если по каким-то причинам механизм сохранения файлов по умоччанию вас не  устраевает(например если хотите
 сохранять файлы в базе, сохранять под другими именами, обрабативать картинки до сохранения, и т.д.)
-вы можете указать callback для сохранения файлов. После сохранения callback должен возвращать ссылку изображения на сайте,
-как параметр при вызове в callback передаётся обьект `CUploadedFile`.
+вы можете указать callback для сохранения файлов. После сохранения callback должен возвращать ссылку файла на сайте и имя
+по умолчанию для вставки в текст, как параметр при вызове в callback передаётся обьект `CUploadedFile`.
 
 
 Использование
@@ -28,10 +28,17 @@ ImageUploadAction
 
 ```php
 'imgUpload'=>array(
-    'class'=>'ext.imperavi-redactor-widget.ImageUploadAction',
-    'directory'=>'uploads',
+    'class' => 'ext.redactor-upload-action.RedactorUploadAction',
+    'directory'=>'uploads/images',
     'validator'=>array(
         'mimeTypes' => array('image/png', 'image/jpg', 'image/gif', 'image/jpeg', 'image/pjpeg'),
+    )
+),
+'fileUpload'=>array(
+    'class' => 'ext.redactor-upload-action.RedactorUploadAction',
+    'directory'=>'uploads/files',
+    'validator'=>array(
+        'types' => 'txt, pdf, doc, docx',
     )
 ),
 ```
@@ -44,6 +51,10 @@ $this->widget('ImperaviRedactorWidget', array(
     'options' => array(
         'imageUpload'=>$this->createUrl('imgUpload'), // адрес действия на сервере
         'imageUploadErrorCallback'=>'js:function(obj, json){ alert(json.error); }', // функция для отображения ошибок загрузки пользователю
+
+        'fileUpload'=>$this->createUrl('fileUpload'),
+        'fileUploadErrorCallback'=>'js:function(obj, json){ alert(json.error); }',
+
         // Если используется проверка CSRF – добавляем соответствующие параметры к запросу
         'uploadFields'=>array(
             Yii::app()->request->csrfTokenName => Yii::app()->request->csrfToken,
@@ -63,34 +74,34 @@ class TestController extends Controller
 {
     /**
      * @param $file CUploadedFile
-     * @return string
+     * @return string[] url to uploaded file and file name to insert in redactor by default
+     * @throws CException
      */
     public function save($file)
     {
         $webroot = Yii::getPathOfAlias('webroot');
         $dstDir = '/uploads/';
-    
+
         if (!is_dir($webroot . $dstDir)) {
             mkdir($webroot . $dstDir, 0777, true);
         }
-    
+
         $ext = $file->getExtensionName();
         $name = $file->name;
         if (strlen($ext)) $name = substr($name, 0, -1 - strlen($ext));
-    
+
         for ($i = 1, $filePath = $dstDir . $name . '.' . $ext; file_exists($webroot . $filePath); $i++) {
             $filePath = $dstDir . $name . " ($i)." . $ext;
         }
-    
-        $file->saveAs($webroot . $filePath);
-        return $filePath;
-    }
 
+        $file->saveAs($webroot . $filePath);
+        return array($filePath, $file->name);
+    }
     public function actions()
     {
         return array(
             'imgUpload' => array(
-                'class' => 'ext.imperavi-redactor-widget.ImageUploadAction',
+                'class' => 'ext.redactor-upload-action.RedactorUploadAction',
                 'saveCallback' => array($this, 'save'),
                 'validator' => array(
                     'mimeTypes' => array('image/png', 'image/jpg', 'image/gif', 'image/jpeg', 'image/pjpeg'),

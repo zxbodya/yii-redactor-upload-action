@@ -6,7 +6,7 @@
  *
  * For examples see image_upload_readme.md
  */
-class ImageUploadAction extends CAction
+class RedactorUploadAction extends CAction
 {
     /**
      * Path to directory where to save uploaded files(relative path from webroot)
@@ -38,7 +38,7 @@ class ImageUploadAction extends CAction
     /**
      * Function used to save image by default
      * @param CUploadedFile $file
-     * @return string
+     * @return string[] url to uploaded file and file name to insert in redactor by default
      * @throws CException
      */
     public function save($file)
@@ -61,9 +61,16 @@ class ImageUploadAction extends CAction
             mkdir($webroot . $dstDir, 0777, true);
         }
 
-        $filePath = $dstDir . $id . $file->extensionName;
+        $ext = $file->getExtensionName();
+        $name = $file->name;
+        if (strlen($ext)) $name = substr($name, 0, -1 - strlen($ext));
+
+        for ($i = 1, $filePath = $dstDir . $name . '.' . $ext; file_exists($webroot . $filePath); $i++) {
+            $filePath = $dstDir . $name . " ($i)." . $ext;
+        }
+
         $file->saveAs($webroot . $filePath);
-        return $filePath;
+        return array(Yii::app()->baseUrl . $filePath, $file->name);
     }
 
     public function run()
@@ -78,9 +85,10 @@ class ImageUploadAction extends CAction
         $uploadModel->file = CUploadedFile::getInstanceByName('file');
 
         if ($uploadModel->validate()) {
-            $fileLink = call_user_func($save, $uploadModel->file);
+            list($fileLink, $fileName) = call_user_func($save, $uploadModel->file);
             echo CJSON::encode(array(
                 'filelink' => $fileLink,
+                'filename' => $fileName,
             ));
         } else {
             echo CJSON::encode(array(
